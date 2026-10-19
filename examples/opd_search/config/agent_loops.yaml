@@ -1,0 +1,2 @@
+- name: opd_search_agent
+  _target_: verl.experimental.agent_loop.opd_search_agent_loop.OPDSearchAgentLoop

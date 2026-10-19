@@ -1,0 +1,11 @@
+{
+  "upstream": "https://github.com/verl-project/verl.git",
+  "branch": "main",
+  "commit": "18cfb74852a053a27dcf301d3318a093be81b628",
+  "checked_out_on": "2026-10-17",
+  "paper": "https://arxiv.org/pdf/2608.24310",
+  "paper_version": "2608.24310v1",
+  "student": "Qwen/Qwen2.5-3B",
+  "teacher": "Qwen/Qwen2.5-7B-Instruct",
+  "stage": "OPD only; no subsequent GRPO training has been run"
+}
