@@ -8,7 +8,6 @@ SearchOPD 在 verl 原生训练流程上实现带检索工具的 on-policy disti
 
 本仓库基于 [verl](https://github.com/verl-project/verl)，开发基线为 `18cfb74852a053a27dcf301d3318a093be81b628`，以该基线的源代码快照开始本项目的独立提交历史，保留上游[许可证](LICENSE)和[原始 README](README.verl.md)。主要新增实现集中在 `examples/opd_search/`、`tests/experimental/opd_search/`，以及 verl 的 distillation 和 agent-loop 接口。
 
-这是研究复现与实验实现。当前结果对应纯 OPD 阶段，不代表完成原论文全部训练阶段或官方 benchmark 复现。
 
 ## 已实现能力
 

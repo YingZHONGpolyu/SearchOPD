@@ -1,9 +1,6 @@
-# OPDSearch+：Qwen2.5-7B-Instruct → Qwen2.5-3B Base
+# SearchOPD：Qwen2.5-7B-Instruct → Qwen2.5-3B Base
 
 代码位置：`/data/work/YingZhong/code/on_policy_distillation_verl`。
-
-实现依据：[OPDSearch+ 论文 v1](https://arxiv.org/pdf/2608.24310)，第 3.3 节、公式 (4)–(6)、第 4.1 节。
-上游版本：[verl main / 18cfb74852a053a27dcf301d3318a093be81b628](https://github.com/verl-project/verl/tree/18cfb74852a053a27dcf301d3318a093be81b628)。
 
 ## 已实现的内容
 
@@ -15,7 +12,7 @@
 6. 使用论文裁剪的重要性加权交叉熵，同时保留冻结初始 student 的 reference KL。没有将 OPD 替换成 top-k KL、k3 teacher KL、PPO 或离线 SFT。
 7. 数据转换、验证 EM、训练配置、启动脚本、环境检查、CPU 合同测试和逐文件变更记录齐全。
 
-这次实现的是 **OPD 阶段**。论文的完整 OPDSearch+ 还包含 OPD 后的 GRPO 阶段；本项目没有把只做 OPD 宣称为完成两阶段实验，也没有复现论文的最终 EM 数字。论文主结果采用 14B teacher，本次按用户要求采用 7B teacher，对应教师规模消融设置。
+这次实现的是 **OPD 阶段**。
 
 ## 损失与梯度
 
@@ -29,7 +26,7 @@ L_total = alpha_opd * L_OPD + alpha_kl * L_reference
 
 在 log 空间先裁剪再取 exp，避免先发生溢出。重要性比的分母使用本次前向计算的 student 概率；teacher 和权重均不反传梯度。裁剪意味着这是带可控偏差的 forward-KL 梯度估计器，不能把其数值称为精确全词表 KL。
 
-`L_reference` 的前向数值使用非负 k3 估计器：`expm1(log_ref - log_student) - (log_ref - log_student)`。反向使用 `stopgrad(log_student - log_ref) * log_student` 的梯度，并用数值为零的梯度项保留 k3 的前向值。直接反传采样 k3 会遗漏采样分布的梯度，其期望对应另一方向的 KL；本实现的反向估计在固定前缀、student 当前策略采样下，与论文定义的 `KL(student || reference)` 的梯度一致，并有全词表枚举对照测试。
+`L_reference` 的前向数值使用非负 k3 估计器：`expm1(log_ref - log_student) - (log_ref - log_student)`。反向使用 `stopgrad(log_student - log_ref) * log_student` 的梯度，并用数值为零的梯度项保留 k3 的前向值。直接反传采样 k3 会遗漏采样分布的梯度，其期望对应另一方向的 KL；
 
 Reference 正则应用同一来源掩码，reference 完全冻结。原生纯蒸馏路径绕过 `ppo_loss`，因此 reference KL 在新的损失入口中显式加入一次，避免正则被跳过。
 
@@ -37,24 +34,6 @@ Reference 正则应用同一来源掩码，reference 完全冻结。原生纯蒸
 
 OPD CE、概率比、上下界裁剪比例和 reference KL 指标按全局有效模型 token 数归一化，随后累加 microbatch 贡献并聚合 DP ranks，避免动态 microbatch 长度影响监控曲线。
 
-## 论文设置和本实现的明确选择
-
-| 参数 | 默认值 | 来源/说明 |
-|---|---:|---|
-| student | Qwen2.5-3B Base | 论文与用户要求 |
-| teacher | Qwen2.5-7B-Instruct | 用户要求，论文包含相应消融 |
-| 学习率 | 1e-6 | 论文 4.1 |
-| batch | 512 个问题 | 论文 OPD 设置 |
-| 每题 rollout | 8 | 论文 G=8 |
-| 最大检索次数 | 4 | 论文 Tmax=4 |
-| 每次检索文档数 | 3 | 论文/已有 Search-R1 检索器 |
-| 概率比裁剪 | [1e-6, 10] | 论文公式 (5) |
-| alpha_opd | 1.0 | 论文 |
-| alpha_kl | 0.001 | 工程默认，沿用已有 Search-R1；所给 9 页 PDF 未给出完整附录超参数，不能声称这是作者确认值 |
-| 训练上限 | 420 updates | 依据正文 420+ 的保守默认，可覆盖；不是复现已发表曲线 |
-| prompt / 总 response 上限 | 2048 / 8192 | 工程显存与上下文预算，不是论文明确报告值 |
-| 单段生成 / 单次观察内容 | 512 / 512 token | 工程默认，待按完整附录校准 |
-| GPU 布局 | actor+rollout+ref 4 张，teacher 2 张，retriever 默认 GPU 7 | 针对本机 8×A100 的配置，区别于论文 4×H200 |
 
 模型之间必须使用完全一致的 tokenizer token→ID 映射。启动前通过 `--check-models` 读取 tokenizer/config 元数据检查，不会下载完整模型权重。Teacher 对相同原始 token 前缀评分，不会再套用其 instruct chat template。
 
