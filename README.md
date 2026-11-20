@@ -28,7 +28,6 @@ SearchOPD 在 verl 原生训练流程上实现带检索工具的 on-policy disti
 | [环境说明](examples/opd_search/OPD_ENVIRONMENT.md) | 经过验证的软件版本与服务器兼容处理 |
 | [七卡配置](examples/opd_search/FORMAL_7GPU.md) | student/teacher 资源分配、检索 GPU 和显存设置 |
 | [W&B 记录](examples/opd_search/WANDB.md) | 登录、指标、实验身份与恢复 |
-| [逐文件变更](examples/opd_search/CHANGES.md) | 相对上游基线的实现清单 |
 | [真实模型检查](examples/opd_search/E2E_VALIDATION.md) | 小规模训练、恢复与 checkpoint 验证记录 |
 
 原实验使用 GPU 0–6 的七张 A100 80GB 训练（四卡 student、三卡 teacher），另用 GPU 7 运行 E5 与完整 FP32 FAISS 索引。检索服务需先就绪。正式训练入口为：

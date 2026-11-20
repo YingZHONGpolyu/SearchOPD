@@ -39,7 +39,7 @@ OPD CE、概率比、上下界裁剪比例和 reference KL 指标按全局有效
 
 ## 当前服务器验证状态
 
-已安装独立 Conda 环境 `opd_env`，具体版本、兼容处理与 GPU 算子验证见 [OPD_ENVIRONMENT.md](OPD_ENVIRONMENT.md)。代码 review 记录见 [REVIEW.md](REVIEW.md)，后续真实模型端到端训练、参数更新和 checkpoint 恢复结果见 [E2E_VALIDATION.md](E2E_VALIDATION.md)。
+已安装独立 Conda 环境 `opd_env`，具体版本、兼容处理与 GPU 算子验证见 [OPD_ENVIRONMENT.md](OPD_ENVIRONMENT.md)。后续真实模型端到端训练、参数更新和 checkpoint 恢复结果见 [E2E_VALIDATION.md](E2E_VALIDATION.md)。
 
 - 数学、检索状态机、真实本地 HTTP 协议、数据转换和 Hydra 配置：28 项便携 CPU 测试通过，opd_env 与 searchr1 均可运行。
 - 新增 7 项原生接口测试全部通过：直接使用 registered loss、jagged padding、vLLM prompt-score parser、AgentLoopOutput 和 V1 TransferQueue postprocessor；模型生成、检索和队列传输使用 stub。它覆盖真实接口契约，但不启动模型或 Ray 集群。
@@ -134,4 +134,4 @@ python="$CONDA_PREFIX/bin/python"
 
 便携 CPU 测试仍可在已有 `searchr1` 环境运行。原生接口测试需要 `opd_env`。完整训练启动器还会检查数据、tokenizer 和检索服务。
 
-逐文件说明见 [CHANGES.md](CHANGES.md)，上游基线和模型配置见 [BASELINE.json](BASELINE.json)。
+上游基线见仓库根目录的 [README](../../README.md)，模型与训练配置见 [opd_search.yaml](config/opd_search.yaml)。
