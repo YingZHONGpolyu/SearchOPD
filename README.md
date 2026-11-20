@@ -38,6 +38,87 @@ bash examples/opd_search/run_formal_7gpu.sh
 
 该入口默认目标为 420 步。下述已完成实验按用户要求，在第 350 步 checkpoint 完整验证后结束；不要将 350 步结果理解为已经跑完 420 步。
 
+## 如何运行
+
+### 1. 环境与模型准备
+
+已验证的正式环境为 Linux、8 张 A100 80GB 和独立 Conda 环境 `opd_env`。四张 GPU 用于 student，三张用于 teacher，一张用于检索。依赖版本及安装兼容处理见 [环境说明](examples/opd_search/OPD_ENVIRONMENT.md)。`setup_env.sh` 会激活并验证现有环境。
+
+获取代码可以运行 `git clone https://github.com/YingZHONGpolyu/SearchOPD.git`。下面的命令使用原实验服务器路径，新机器请替换相应路径。
+
+```bash
+cd /data/work/YingZhong/code/on_policy_distillation_verl
+export OPD_CONDA_ROOT=/data/work/YingZhong/miniconda3
+export OPD_CONDA_ENV=opd_env
+export OPD_MODEL_ROOT=/data/work/YingZhong/models
+source "$OPD_CONDA_ROOT/etc/profile.d/conda.sh"
+conda activate "$OPD_CONDA_ENV"
+bash examples/opd_search/setup_env.sh
+```
+
+提前将模型权重和 tokenizer 下载到 `$OPD_MODEL_ROOT/Qwen2.5-3B`、`$OPD_MODEL_ROOT/Qwen2.5-7B-Instruct`，将检索编码器放到 `$OPD_MODEL_ROOT/e5-base-v2`。正式入口以离线模式加载本地模型。
+
+### 2. 准备问答数据
+
+输入目录需要包含 `train.parquet` 和 `test.parquet`。原服务器已有转换后的数据，需要重建时执行以下命令。
+
+```bash
+python examples/opd_search/prepare_data.py \
+  --input-dir /data/work/YingZhong/data/nq_hotpotqa_train \
+  --output-dir /data/work/YingZhong/data/nq_hotpotqa_opd
+```
+
+### 3. 启动检索服务
+
+先准备 Search-R1 代码目录，以及配套的 `e5_Flat.index` 和 `wiki-18.jsonl`。模型、语料和索引需要自行准备。在终端 A 中进入本仓库，设置上述环境变量后运行，并保持服务进程运行。
+
+```bash
+export SEARCH_R1_ROOT=/data/work/YingZhong/code/Search-R1
+export SEARCH_DATA_DIR=/data/work/YingZhong/data/search_data
+# 新环境首次使用 GPU FAISS 时执行
+bash examples/opd_search/install_retriever_gpu.sh
+RETRIEVER_GPU=7 RETRIEVER_FAISS_DEVICE=gpu \
+  bash examples/opd_search/start_retriever.sh
+```
+
+默认服务地址为 `http://127.0.0.1:8000/retrieve`，每次返回 top-3 结果。完整 FP32 索引约占 60 GiB，GPU 7 同时运行 E5。可设置 `RETRIEVER_FAISS_DEVICE=cpu` 使用 CPU FAISS。
+
+### 4. 启动 OPD 训练
+
+在终端 B 中进入仓库，设置步骤 1 的环境变量并激活 `opd_env` 后执行。
+
+```bash
+python examples/opd_search/preflight.py --config-only
+python examples/opd_search/preflight.py --runtime-only
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6
+export OPD_OUTPUT_DIR="$PWD/checkpoints/opd_search_new"
+export WANDB_MODE=offline
+bash examples/opd_search/run_formal_7gpu.sh
+```
+
+训练启动器还会检查数据、模型 tokenizer 和检索服务。默认 batch=512，每题采样 8 条轨迹，目标 420 步，每 50 步验证和保存。在线记录可先运行 `wandb login`，再设置 `WANDB_MODE=online`，详见 [W&B 说明](examples/opd_search/WANDB.md)。
+
+其他机器的数据路径和检索地址可通过 Hydra 参数覆盖。
+
+```bash
+bash examples/opd_search/run_formal_7gpu.sh \
+  data.train_files=/path/to/opd/train.parquet \
+  data.val_files=/path/to/opd/test.parquet \
+  opd_search.url=http://127.0.0.1:8000/retrieve
+```
+
+### 5. 小规模检查与恢复
+
+检索服务就绪后，可先运行独立的小规模训练和恢复流程。该入口的 GPU 配置见 [OPD 使用说明](examples/opd_search/README.md)。
+
+```bash
+export OPD_SMOKE_OUTPUT="$PWD/checkpoints/opd_smoke_new"
+bash examples/opd_search/run_smoke.sh train
+bash examples/opd_search/run_smoke.sh resume
+```
+
+正式入口在相同输出目录重复启动时，通过 `resume_mode=auto` 恢复 checkpoint。新实验请使用独立的 `OPD_OUTPUT_DIR`。训练指标显示在控制台和 W&B，验证成绩使用 `val-core/<dataset>/acc/mean@1`，验证生成记录位于输出目录的 `validation/`。
+
 ## 已完成实验：step 350
 
 Teacher 为 Qwen2.5-7B-Instruct，student 为 Qwen2.5-3B Base；训练问题 batch=512，每题生成 8 条轨迹。第 350 步对 51,713 条验证样本执行单次生成评测，19,386 条严格答案匹配正确，按样本数加权 EM 为 **37.49%**。
